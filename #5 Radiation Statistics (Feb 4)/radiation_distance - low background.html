@@ -1,0 +1,200 @@
+<html>
+<head>
+</head>
+
+<body>
+
+<H1>Radiation Simulator</H1>
+
+<p id="myheader"></p>
+
+<br> 
+<label> Source to detector distance:</label><input type="number" value = "1." name="keyword1"
+		 id="dist" step="0.1" min="1.0" max="10" width="6"> cm 
+  (1 - 10 cm)
+<br>
+<label> Shielding thickness:</label><input type="number" value="0" 
+			    id="shield" min="0" max="50" width="6"> sheets
+<br>
+<button id = "insert_but" onclick="insert_routine();"> Insert Source </button>
+<button id = "remove_but" onclick="remove_routine();" disabled=true>
+  Remove Source </button>
+<br>
+<button id = "start_but" onclick="start_routine();"> Start Counting </button>
+<button id = "stop_but" onclick="stop_routine();" disabled=true> Stop Counting</button>
+<button onclick="reset_routine();"> Reset Count</button>
+
+<p id="output" </p>
+
+<script type='text/javascript'> 
+  var count = 0;
+  var myVar = 0;
+  var time = 0;
+  var total = 0;
+  var running = 0;
+  var old_distance = -1;
+  var chosen_distance = 1.;
+  //var chosen_distance = 0;
+  var old_shielding = -1;
+  var chosen_shielding = 0;
+  var flag = 0;
+  var source_inserted = 0;
+  function updateDisplay(){
+      if (running){
+	  message = "Status: Running";
+      }
+      else{
+	  message = "Status: Idle";
+      }
+      if (flag){
+      document.getElementById("output").innerHTML = "Counts: "
+	      + total + " Time:   " + time + " s <br>" + message
+	      +"<br>  dist: " + chosen_shielding;
+	  flag = 0
+      }
+      else{
+      document.getElementById("output").innerHTML = "Counts: "
+	  + total + " Time:   " + time + " s <br>" + message;
+      }
+  }
+  function insert_routine(){
+      source_inserted = 1;
+      document.getElementById('insert_but').disabled = true;
+      document.getElementById('remove_but').disabled = false;
+  }
+  function remove_routine(){
+      source_inserted = 0;
+      document.getElementById('remove_but').disabled = true;
+      document.getElementById('insert_but').disabled = false;
+  }
+  function start_routine(){
+      if (running != 1){
+	  myVar = setInterval(myTimer, 1000);
+	  running = 1;
+      }
+      updateDisplay();
+      document.getElementById('start_but').disabled = true;
+      document.getElementById('stop_but').disabled = false;
+  }
+  function stop_routine(){
+      running = 0;
+      clearInterval(myVar);
+      updateDisplay();
+      document.getElementById('start_but').disabled = false;
+      document.getElementById('stop_but').disabled = true;
+  }
+  function reset_routine(){
+      time = 0;
+      total = 0;
+      updateDisplay();
+  }
+      
+  function myTimer() {
+//      var distance = document.getElementById("dist").value; 
+       var distance = document.getElementById("dist").value; 
+     var shielding = document.getElementById("shield").value;
+      count = count + 1;
+      time = time + 1;
+//  /*      if (distance > 10 || distance < 1){
+      if (distance > 10 || distance < 1){
+        document.getElementById("output").innerHTML = "Distance must be between 1-10 cm";
+        return;
+       }
+     if (distance < 1){
+		      distance = 1;
+	 } 
+// */
+      if (shielding < 0){
+	  shielding = 0;
+      }
+      
+      // if the distance is changed, add in some fluctuation:
+// /*      if (distance != old_distance){
+      if (distance != old_distance){
+	  chosen_distance = 1.*distance + 0.028867*random_gauss()/2;
+	  old_distance = distance;
+      }
+// */
+      if (shielding != old_shielding){
+	  if (shielding > 0){
+	      chosen_shielding = 1.*shielding +0.01*random_gauss()*Math.sqrt(shielding);
+//	  flag = 1;
+	  }
+	  else{
+	      chosen_shielding = 0;
+	  }
+	  old_shielding = shielding;
+//	  flag = 1;
+      }
+      
+      // calculate average expected for shielding and distance: set it to lambda.
+      /*   
+       add a scale offset = 0.5     
+      //     Rate = (69.06/(dist-0.5) ^2 ) +  0.5
+        Rate = (39.06/(dist-0.5) ^2 ) +  0.5
+     */
+      
+      /*  Poisson distribution: P(k; lambda) probability of   finding k
+       events in an interval if the average is lambda
+       Algorithm for Poisson distribution from Wikipedia (Knuth's,
+       modified to not underflow with large lambda).
+      */
+      var rate = 0;
+      // var background = 0.5;
+
+      var background = 0.1;
+
+
+      if (source_inserted){
+	  distance_true=chosen_distance-0.5
+	//  rate = 69.06 / distance_true/distance_true;
+	  rate = 39.06 / distance_true/distance_true;
+	  rate = rate*Math.exp(-chosen_shielding/2.42728);
+	  rate = rate + background;
+      }
+      else{
+	  rate = background;
+      }
+      var lambda = rate; // average number per second
+      var lamLeft = lambda;
+      var k = 0;
+      var p = 1;
+      var pp = 2;
+      var STEP = 500;
+      var u = 0;
+      while( pp > 1){
+	  k = k+1;
+	  u = Math.random();
+	  p = p*u;
+	  while (p <1 && lamLeft > 0){
+	      if (lamLeft > STEP){
+		  p = p * Math.exp(STEP);
+		  lamLeft = lamLeft - STEP;
+	      }
+	      else{
+		  p = p *Math.exp(lamLeft);
+		  lamLeft = 0;
+	      }
+	  }
+	  pp = p;
+      }
+      k = k-1;
+      total = total + k;
+      updateDisplay();
+  }
+  
+  function random_gauss(){
+      var u = 0, v = 0;
+      while (u === 0) u = Math.random();
+      while (v === 0) v = Math.random();
+      return Math.sqrt( -2.0 * Math.log(u))*Math.cos(2.0*Math.PI * v);
+  }
+  document.getElementById('remove_but').disabled = true;
+  document.getElementById('insert_but').disabled = false;
+  document.getElementById('start_but').disabled = false;
+  document.getElementById('stop_but').disabled = true;
+  updateDisplay();
+  </script>
+
+</body>
+</html>
